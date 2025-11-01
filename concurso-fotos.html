@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Concurso Familiar de Fotos — Privado</title>
+  <style>
+    :root{
+      --bg:#071029; --card:#0b1220; --muted:#94a3b8; --accent:#7c3aed;
+      --radius:12px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; min-height:100vh; background:linear-gradient(180deg,#071029 0%, #071424 60%); color:#e6eef8; padding:28px; display:flex; justify-content:center}
+    .wrap{width:100%; max-width:1100px}
+    header{display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+    .controls{display:flex; gap:10px; align-items:center}
+    .btn{background:transparent; border:1px solid rgba(255,255,255,0.04); padding:9px 12px; border-radius:10px; cursor:pointer; color:inherit; font-weight:600}
+    .btn.primary{background:linear-gradient(90deg,var(--accent), #5b21b6); box-shadow:0 6px 18px rgba(124,58,237,0.12)}
+    .board{display:grid; grid-template-columns:1fr 380px; gap:20px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:var(--radius); padding:18px; border:1px solid rgba(255,255,255,0.03)}
+    .gallery{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:14px}
+    .card{background:var(--card); border-radius:12px; overflow:hidden; display:flex; flex-direction:column}
+    .card img{width:100%; display:block; aspect-ratio:4/3; object-fit:cover}
+    .meta{padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .meta .title{font-size:14px; font-weight:600}
+    .meta .votes{font-size:13px; color:var(--muted)}
+    .voteBtn{padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); background:transparent; cursor:pointer}
+    .uploadBox{display:flex; flex-direction:column; gap:12px}
+    .input{background:rgba(255,255,255,0.02); border-radius:10px; padding:10px; border:1px dashed rgba(255,255,255,0.03); color:inherit; width:100%}
+    .small{font-size:13px;color:var(--muted)}
+    .progress{height:10px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden}
+    .progress > i{display:block;height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #a78bfa)}
+    @media(max-width:980px){ .board{grid-template-columns:1fr} body{padding:14px} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Concurso Familiar de Fotos — Privado</h1>
+        <p class="lead">Sube anónimamente y votad entre todos. Sin cuentas.</p>
+      </div>
+      <div class="controls">
+        <div id="userBadge" class="small">Conectando...</div>
+        <button id="copyLink" class="btn">Copiar link</button>
+        <a id="openUpload" class="btn primary" href="#upload">Subir foto</a>
+      </div>
+    </header>
+
+    <main class="board">
+      <section class="panel">
+        <h3 style="margin-top:0">Galería</h3>
+        <div id="gallery" class="gallery">
+          <!-- fotos aquí -->
+        </div>
+        <footer class="small" style="margin-top:12px">Ordenadas por fecha. Un voto por foto por dispositivo (uid anónimo).</footer>
+      </section>
+
+      <aside class="panel" id="upload">
+        <div class="uploadBox">
+          <div>
+            <h4 style="margin:0">Subir foto</h4>
+            <p class="small">JPG/PNG hasta 10MB. Subida directa a Cloudinary.</p>
+          </div>
+
+          <input id="titleInput" class="input" placeholder="Título (opcional)" />
+          <input id="fileInput" type="file" accept="image/*" class="input" />
+          <div style="display:flex; gap:8px">
+            <button id="uploadBtn" class="btn primary">Subir</button>
+            <button id="clearBtn" class="btn">Borrar</button>
+          </div>
+
+          <div>
+            <div class="small">Progreso</div>
+            <div class="progress" aria-hidden><i id="progressBar"></i></div>
+            <div id="status" class="small">—</div>
+          </div>
+
+          <hr style="border:none;height:1px;background:rgba(255,255,255,0.02);margin:12px 0">
+
+          <div>
+            <h4 style="margin:0">Estadísticas</h4>
+            <p id="stats" class="small">Cargando...</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- -------------- SUSTITUYE ESTAS VARIABLES -------------- -->
+  <script type="module">
+    // 1) Pega aquí tu firebaseConfig (obtenido en Project Settings → Your apps)
+    const firebaseConfig = {
+      // PON_TU_FIREBASE_CONFIG_AQUI
+      // ejemplo:
+      // apiKey: "AIza...",
+      apikey: "AIzaSyBbRmeJ7mSyLPNvGrdPGIM6m2RU_PcYmxA",
+      // authDomain: "mi-proyecto.firebaseapp.com",
+      authDomain:  "concursofotografias-36ea3.firebaseapp.com",
+      // projectId: "mi-proyecto",
+      projectId: "concursofotografias-36ea3",
+      // appId: "1:xxxxx:web:yyyyy"
+      appId: "1:876890016701:web:6979dfee828f53a45a20d4"
+    };
+
+    // 2) Pega aquí tu Cloudinary cloud name y upload preset (unsigned)
+    const CLOUDINARY = {
+      cloudName: 'CLOUD_NAME_HERE',
+      unsignedUploadPreset: 'UPLOAD_PRESET_HERE'
+    };
+  </script>
+
+  <!-- Firebase modular SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, runTransaction, getDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    // Inicializa firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // DOM
+    const fileInput = document.getElementById('fileInput');
+    const titleInput = document.getElementById('titleInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const galleryEl = document.getElementById('gallery');
+    const progressBar = document.getElementById('progressBar');
+    const status = document.getElementById('status');
+    const stats = document.getElementById('stats');
+    const userBadge = document.getElementById('userBadge');
+    const copyLink = document.getElementById('copyLink');
+
+    let currentUser = null;
+
+    // Autenticación anónima
+    signInAnonymously(auth).catch((err)=>{ console.error('Anon signIn error', err); userBadge.textContent='Error auth'; });
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        currentUser = user;
+        userBadge.textContent = `Usuario anónimo • uid:${user.uid.slice(0,8)}`;
+        loadGallery();
+        loadStats();
+      } else {
+        userBadge.textContent = 'No conectado';
+      }
+    });
+
+    // Copiar link
+    copyLink.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(location.href); copyLink.textContent='Copiado ✅'; setTimeout(()=>copyLink.textContent='Copiar link',1200) }catch(e){ alert('No se pudo copiar') }
+    });
+
+    clearBtn.addEventListener('click', ()=>{ fileInput.value=''; titleInput.value=''; progressBar.style.width='0%'; status.textContent='—' });
+
+    // Subida a Cloudinary (cliente, unsigned)
+    uploadBtn.addEventListener('click', async ()=>{
+      const file = fileInput.files[0];
+      if (!file) { alert('Selecciona un archivo'); return; }
+      if (file.size > 10*1024*1024) { alert('Archivo demasiado grande (límite 10MB)'); return; }
+
+      uploadBtn.disabled = true; status.textContent = 'Preparando...';
+      try {
+        // FormData para Cloudinary
+        const form = new FormData();
+        form.append('file', file);
+        form.append('upload_preset', CLOUDINARY.unsignedUploadPreset);
+        // (opcional) agregar folder, context, etc:
+        form.append('context', `title=${titleInput.value || ''}`);
+
+        // Petición directa a Cloudinary
+        const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`;
+        // Hacemos fetch con seguimiento de progreso (usando XHR para progreso)
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + '%';
+            status.textContent = `Subiendo: ${pct}%`;
+          }
+        };
+        const resp = await new Promise((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+            else reject(new Error('Error Cloudinary: ' + xhr.responseText));
+          };
+          xhr.onerror = () => reject(new Error('Error de red'));
+          xhr.send(form);
+        });
+
+        // resp.secure_url contiene la URL pública de la imagen
+        const secureUrl = resp.secure_url;
+        // Guardar metadata en Firestore
+        await addDoc(collection(db, 'photos'), {
+          title: titleInput.value || '',
+          url: secureUrl,
+          cloudinary_id: resp.public_id || '',
+          votes: 0,
+          uploadedAt: serverTimestamp()
+        });
+
+        status.textContent = 'Subida completa ✅';
+        titleInput.value = ''; fileInput.value='';
+        loadGallery(); loadStats();
+      } catch(err) {
+        console.error(err);
+        alert('Error al subir: ' + (err.message || err));
+      } finally { uploadBtn.disabled = false }
+    });
+
+    // Cargar galería
+    async function loadGallery(){
+      galleryEl.innerHTML = '<div class="small" style="grid-column:1/-1">Cargando...</div>';
+      const q = query(collection(db, 'photos'), orderBy('uploadedAt','desc'));
+      const snap = await getDocs(q);
+      galleryEl.innerHTML = '';
+      if (snap.empty) { galleryEl.innerHTML = '<div class="small">Aún no hay fotos</div>'; return; }
+      snap.forEach(docSnap => {
+        const data = docSnap.data(); const id = docSnap.id;
+        const card = document.createElement('div'); card.className='card';
+        const img = document.createElement('img'); img.src = data.url; img.alt = data.title || 'Foto';
+        const meta = document.createElement('div'); meta.className='meta';
+        const left = document.createElement('div'); left.innerHTML = `<div class="title">${escapeHtml(data.title || '—')}</div><div class="small">${formatDate(data.uploadedAt)}</div>`;
+        const right = document.createElement('div'); right.style.display='flex'; right.style.flexDirection='column'; right.style.alignItems='flex-end';
+        const votes = document.createElement('div'); votes.className='votes'; votes.textContent = `${data.votes ?? 0} votos`;
+        const vbtn = document.createElement('button'); vbtn.className='voteBtn'; vbtn.textContent='Votar';
+        vbtn.onclick = ()=> votePhoto(id, votes, vbtn);
+        right.appendChild(votes); right.appendChild(vbtn);
+        meta.appendChild(left); meta.appendChild(right);
+        card.appendChild(img); card.appendChild(meta);
+        galleryEl.appendChild(card);
+      });
+    }
+
+    function formatDate(ts){ try{ if(!ts || !ts.seconds) return ''; const d=new Date(ts.seconds*1000); return d.toLocaleString(); }catch(e){return ''} }
+    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }
+
+    // Votar (un voto por uid por foto)
+    async function votePhoto(photoId, votesEl, btn){
+      if (!currentUser) { alert('Aún no conectado'); return; }
+      btn.disabled = true; btn.textContent = 'Procesando...';
+      const uid = currentUser.uid;
+      const photoRef = doc(db, 'photos', photoId);
+      const voteDocRef = doc(db, 'photos', photoId, 'votes', uid);
+
+      try {
+        await runTransaction(db, async (t) => {
+          const vdoc = await t.get(voteDocRef);
+          if (vdoc.exists()) throw new Error('Ya has votado esta foto');
+          t.set(voteDocRef, { votedAt: serverTimestamp() });
+          const p = await t.get(photoRef);
+          if (!p.exists()) throw new Error('Foto no encontrada');
+          const current = p.data().votes || 0;
+          t.update(photoRef, { votes: current + 1 });
+          return current + 1;
+        });
+        const newP = await getDoc(photoRef);
+        votesEl.textContent = `${newP.data().votes} votos`;
+        btn.textContent = 'Votado ✓';
+      } catch(err){
+        if (err.message && err.message.includes('Ya has votado')) alert('Solo puedes votar una vez por foto (por dispositivo).');
+        else alert('Error al votar: '+err.message);
+      } finally { btn.disabled = false }
+    }
+
+    // Stats
+    async function loadStats(){
+      const q = query(collection(db, 'photos'));
+      const snap = await getDocs(q);
+      let total = snap.size; let sumVotes = 0;
+      snap.forEach(s=> sumVotes += (s.data().votes||0));
+      stats.textContent = `${total} fotos · ${sumVotes} votos en total`;
+    }
+
+    // refresco periódico
+    setInterval(()=>{ loadGallery(); loadStats(); }, 30000);
+
+  </script>
+</body>
+</html>
